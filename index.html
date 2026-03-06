@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Email Decoder</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #16161a;
+    --surface2: #1e1e24;
+    --border: #2a2a35;
+    --accent: #6ee7b7;
+    --accent2: #818cf8;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --error: #f87171;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Sora', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── PASTE SCREEN ── */
+  #pasteScreen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    gap: 18px;
+    padding: 40px;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+
+  #pasteScreen.hiding {
+    opacity: 0;
+    transform: scale(0.97);
+    pointer-events: none;
+  }
+
+  .paste-logo {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    margin-bottom: 4px;
+    box-shadow: 0 0 32px rgba(110,231,183,0.2);
+  }
+
+  #pasteScreen h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  #pasteScreen p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-align: center;
+    max-width: 380px;
+    line-height: 1.6;
+  }
+
+  #rawInput {
+    width: 100%;
+    max-width: 700px;
+    height: 200px;
+    background: var(--surface2);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    outline: none;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    line-height: 1.65;
+    padding: 18px 20px;
+    resize: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  #rawInput:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(110,231,183,0.08);
+  }
+  #rawInput::placeholder { color: var(--muted); }
+
+  #errorMsg {
+    color: var(--error);
+    font-size: 0.8rem;
+    background: rgba(248,113,113,0.08);
+    border: 1px solid rgba(248,113,113,0.2);
+    border-radius: 8px;
+    padding: 8px 16px;
+    display: none;
+    animation: shake 0.3s ease;
+  }
+
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+
+  .paste-hint {
+    font-size: 0.72rem;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .kbd {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--text);
+  }
+
+  /* ── EMAIL VIEW SCREEN ── */
+  #emailScreen {
+    display: none;
+    flex-direction: column;
+    height: 100vh;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  #emailScreen.visible {
+    display: flex;
+    opacity: 1;
+  }
+
+  .email-topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .meta-pills {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .meta-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.74rem;
+    max-width: 300px;
+    overflow: hidden;
+  }
+
+  .pill-key {
+    color: var(--muted);
+    font-weight: 700;
+    font-size: 0.63rem;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    flex-shrink: 0;
+  }
+
+  .pill-val {
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .btn {
+    padding: 7px 15px;
+    border-radius: 7px;
+    font-family: 'Sora', sans-serif;
+    font-size: 0.77rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    letter-spacing: 0.01em;
+  }
+
+  .btn-new {
+    background: var(--accent);
+    color: #0d0d0f;
+  }
+  .btn-new:hover { filter: brightness(1.1); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+  .btn-ghost.active-tab { color: var(--accent); border-color: var(--accent); background: rgba(110,231,183,0.06); }
+
+  .btn-download {
+    position: relative;
+    width: 34px;
+    height: 34px;
+    border-radius: 7px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-download:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(110,231,183,0.06);
+  }
+  .btn-download svg { width: 15px; height: 15px; }
+
+  .btn-download::after {
+    content: 'Download as PDF';
+    position: absolute;
+    bottom: calc(100% + 8px);
+    right: 0;
+    background: #1e1e2e;
+    color: var(--text);
+    font-family: 'Sora', sans-serif;
+    font-size: 0.7rem;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s, transform 0.15s;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .btn-download:hover::after {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  #emailFrame {
+    flex: 1;
+    border: none;
+    background: #fff;
+  }
+
+  #sourceView {
+    flex: 1;
+    padding: 20px 26px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    line-height: 1.75;
+    color: #94a3b8;
+    white-space: pre-wrap;
+    word-break: break-all;
+    overflow: auto;
+    display: none;
+    background: var(--surface2);
+  }
+</style>
+</head>
+<body>
+
+<!-- SCREEN 1: Paste -->
+<div id="pasteScreen">
+  <div class="paste-logo">✉️</div>
+  <h1>Email Decoder</h1>
+  <p>Paste raw email data — it decodes automatically the moment you paste.</p>
+
+  <textarea id="rawInput" placeholder="Paste raw email data here…
+
+Supports:
+• SendGrid JSON  (with nested &quot;data&quot; field)
+• JSON with content array
+• Escaped / double-escaped HTML strings
+• Plain HTML"></textarea>
+
+  <div id="errorMsg">⚠️ Could not extract email content — check the format and try again.</div>
+
+  <div class="paste-hint">
+    Paste anywhere on this page &nbsp;·&nbsp; or press
+    <span class="kbd">Ctrl</span>+<span class="kbd">Enter</span> to decode manually
+  </div>
+</div>
+
+<!-- SCREEN 2: Email -->
+<div id="emailScreen">
+  <div class="email-topbar">
+    <div class="meta-pills" id="metaPills"></div>
+    <div class="topbar-right">
+      <button class="btn-download" id="downloadBtn" onclick="downloadPDF()" title="">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v13M7 11l5 5 5-5"/><path d="M5 20h14"/>
+        </svg>
+      </button>
+      <button class="btn btn-ghost" id="sourceBtn" onclick="toggleSource()">HTML Source</button>
+      <button class="btn btn-new" onclick="resetToInput()">⟵ New</button>
+    </div>
+  </div>
+  <iframe id="emailFrame" sandbox="allow-same-origin"></iframe>
+  <pre id="sourceView"></pre>
+</div>
+
+<script>
+// ── Parsing ───────────────────────────────────────────────
+
+function tryParseJsonString(str) {
+  // Try to parse a string value that is itself JSON (handles single and double escaping)
+  try { return JSON.parse(str); } catch(e) {}
+  try { return JSON.parse(JSON.parse('"' + str.replace(/\n/g,'\\n') + '"')); } catch(e) {}
+  return null;
+}
+
+function tryExtractHTML(raw) {
+  raw = raw.trim();
+
+  // 1. Try parsing the whole thing as JSON
+  try {
+    const p = JSON.parse(raw);
+
+    // 1a. Direct email object
+    const r = extractFromObj(p);
+    if (r) return r;
+
+    // 1b. Wrapper object — walk every string-valued key looking for a JSON email payload
+    //     Covers: { request: { data: "<json string>" } }, { data: "<json string>" }, etc.
+    const found = findEmailInObj(p);
+    if (found) return found;
+  } catch(e) {}
+
+  // 2. Regex fallback: grab the raw value of a "data" key even if outer JSON is malformed
+  const dm = raw.match(/"data"\s*:\s*"([\s\S]+)"(?:\s*,?\s*}?\s*$)?/);
+  if (dm) {
+    const inner = dm[1];
+    const parsed = tryParseJsonString(inner);
+    if (parsed) {
+      const r = extractFromObj(parsed);
+      if (r) return r;
+    }
+  }
+
+  // 3. Plain / lightly-escaped HTML
+  if (raw.includes('<!DOCTYPE html') || raw.includes('<html') || raw.includes('<body')) {
+    const html = raw.replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\"/g,'"').replace(/\\\\/g,'\\');
+    return { html, meta: {} };
+  }
+
+  // 4. "value" field regex (last resort)
+  const vm = raw.match(/"value"\s*:\s*"([\s\S]+?)(?="type"|"\}])/);
+  if (vm) {
+    try { return { html: JSON.parse('"' + vm[1] + '"'), meta: {} }; } catch(e) {}
+  }
+
+  return null;
+}
+
+// Recursively walk an object and try to parse any string values as email JSON
+function findEmailInObj(obj, depth = 0) {
+  if (depth > 5) return null;
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (typeof val === 'string' && val.trim().startsWith('{')) {
+      const parsed = tryParseJsonString(val);
+      if (parsed) {
+        const r = extractFromObj(parsed);
+        if (r) return r;
+        // recurse into the parsed object too
+        const nested = findEmailInObj(parsed, depth + 1);
+        if (nested) return nested;
+      }
+    } else if (val && typeof val === 'object' && !Array.isArray(val)) {
+      const r = findEmailInObj(val, depth + 1);
+      if (r) return r;
+    }
+  }
+  return null;
+}
+
+// Pull a sent-date from any recognised field in the top-level wrapper
+function extractDate(obj) {
+  const candidates = [obj.requestAt, obj.sentAt, obj.created_at, obj.timestamp, obj.date, obj.Date];
+  for (const c of candidates) {
+    if (c) {
+      const d = new Date(c);
+      if (!isNaN(d)) return d.toLocaleString(undefined, {
+        year:'numeric', month:'short', day:'numeric',
+        hour:'2-digit', minute:'2-digit',
+        timeZone: 'UTC'
+      }) + ' UTC';
+    }
+  }
+  return null;
+}
+
+function extractFromObj(obj) {
+  let meta = {};
+  if (obj.from) meta.from = (obj.from.name ? obj.from.name + ' <' : '') + (obj.from.email||'') + (obj.from.name ? '>' : '');
+  if (obj.subject) meta.subject = obj.subject;
+  if (obj.personalizations?.[0]?.to) meta.to = obj.personalizations[0].to.map(t=>t.email).join(', ');
+
+  if (Array.isArray(obj.content)) {
+    for (const c of obj.content) if (c.type==='text/html' && c.value) return { html: c.value, meta };
+    if (obj.content[0]?.value) return { html: obj.content[0].value, meta };
+  }
+  if (obj.html) return { html: obj.html, meta };
+  if (obj.body) return { html: obj.body, meta };
+  return null;
+}
+
+// ── Decode & transition ───────────────────────────────────
+
+let _currentHTML = '';
+
+function decode(raw) {
+  const result = tryExtractHTML(raw);
+  if (!result) { showError(); return; }
+
+  const { html, meta } = result;
+  _currentHTML = html;
+
+  // Try to get sent date from the top-level wrapper
+  let sentDate = null;
+  try {
+    const top = JSON.parse(raw);
+    sentDate = extractDate(top);
+  } catch(e) {}
+
+  // Meta pills
+  const pills = document.getElementById('metaPills');
+  pills.innerHTML = '';
+  if (meta.from)    addPill(pills, 'From', meta.from);
+  if (meta.to)      addPill(pills, 'To', meta.to);
+  if (meta.subject) addPill(pills, 'Subject', meta.subject);
+  if (sentDate)     addPill(pills, 'Sent', sentDate);
+
+  // Load content
+  document.getElementById('emailFrame').srcdoc = html;
+  document.getElementById('sourceView').textContent = html;
+
+  // Reset source toggle
+  showPreview();
+
+  // Animate out paste screen → in email screen
+  const ps = document.getElementById('pasteScreen');
+  ps.classList.add('hiding');
+  setTimeout(() => {
+    ps.style.display = 'none';
+    const es = document.getElementById('emailScreen');
+    es.style.display = 'flex';
+    requestAnimationFrame(() => es.classList.add('visible'));
+  }, 240);
+}
+
+function addPill(container, key, val) {
+  const d = document.createElement('div');
+  d.className = 'meta-pill';
+  d.innerHTML = `<span class="pill-key">${key}</span><span class="pill-val">${escapeHtml(val)}</span>`;
+  container.appendChild(d);
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showError() {
+  const e = document.getElementById('errorMsg');
+  e.style.display = 'block';
+  e.style.animation = 'none';
+  void e.offsetWidth;
+  e.style.animation = 'shake 0.3s ease';
+  setTimeout(() => e.style.display = 'none', 3500);
+}
+
+// ── PDF Download ──────────────────────────────────────────
+
+function downloadPDF() {
+  if (!_currentHTML) return;
+  const w = window.open('', '_blank');
+  w.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <style>
+      @media print { body { margin: 0; } }
+    </style>
+    <script>
+      window.onload = function() {
+        window.print();
+        setTimeout(() => window.close(), 500);
+      };
+    <\/script>
+  </head><body>${_currentHTML}</body></html>`);
+  w.document.close();
+}
+
+// ── Reset ─────────────────────────────────────────────────
+
+function resetToInput() {
+  const es = document.getElementById('emailScreen');
+  es.classList.remove('visible');
+  setTimeout(() => {
+    es.style.display = 'none';
+    const ps = document.getElementById('pasteScreen');
+    ps.style.display = 'flex';
+    ps.classList.remove('hiding');
+    document.getElementById('rawInput').value = '';
+    document.getElementById('rawInput').focus();
+  }, 300);
+}
+
+// ── Source toggle ─────────────────────────────────────────
+
+let sourceOpen = false;
+
+function toggleSource() {
+  sourceOpen = !sourceOpen;
+  if (sourceOpen) {
+    document.getElementById('emailFrame').style.display = 'none';
+    document.getElementById('sourceView').style.display = 'block';
+    document.getElementById('sourceBtn').classList.add('active-tab');
+    document.getElementById('sourceBtn').textContent = 'Preview';
+  } else {
+    showPreview();
+  }
+}
+
+function showPreview() {
+  sourceOpen = false;
+  document.getElementById('emailFrame').style.display = 'block';
+  document.getElementById('sourceView').style.display = 'none';
+  document.getElementById('sourceBtn').classList.remove('active-tab');
+  document.getElementById('sourceBtn').textContent = 'HTML Source';
+}
+
+// ── Listeners ─────────────────────────────────────────────
+
+// Auto-decode on paste (works anywhere on page)
+document.addEventListener('paste', function(e) {
+  // Only if email screen not already showing
+  if (document.getElementById('emailScreen').classList.contains('visible')) return;
+  const text = e.clipboardData?.getData('text');
+  if (text && text.trim()) {
+    document.getElementById('rawInput').value = text;
+    setTimeout(() => decode(text), 0);
+  }
+});
+
+// Ctrl+Enter in textarea
+document.getElementById('rawInput').addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    const v = this.value.trim();
+    if (v) decode(v);
+  }
+});
+</script>
+</body>
+</html>
